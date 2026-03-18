@@ -1,16 +1,16 @@
 spring.application.name=BancoLuiz
 
-# URL de conexão (Endereço do cofre)
+# URL de conexï¿½o (Endereï¿½o do cofre)
 spring.datasource.url=jdbc:postgresql://localhost:5432/jbank_db
 
-# Usuário padrão do Postgres
+# Usuï¿½rio padrï¿½o do Postgres
 spring.datasource.username=postgres
 
-# A senha que você definiu no ALTER USER
-spring.datasource.password=1010
+# A senha que vocï¿½ definiu no ALTER USER
+spring.datasource.password=SUA_SENHA_AQUI
 
 # O "Tradutor" (Driver)
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-# Oculta as verificações do Spring
+# Oculta as verificaï¿½ï¿½es do Spring
 logging.level.root=WARN
