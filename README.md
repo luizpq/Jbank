@@ -1,4 +1,3 @@
-O JBank é uma aplicação de console desenvolvida para consolidar conceitos avançados de Programação Orientada a Objetos (POO) e integração de sistemas Java com bancos de dados relacionais (PostgreSQL). O projeto simula as operações críticas de um caixa eletrônico, priorizando a integridade dos dados e a experiência do usuário via terminal.
 Objetivos do Projeto:
 
    . Praticar o uso de Herança e Polimorfismo (Contas Corrente vs. Poupança).
