@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 
 
-
 @Service
 public class AutenticacaoService {
 
@@ -138,6 +137,13 @@ public class AutenticacaoService {
         }
     }
 
+    /**
+     * Recupera todas as contas vinculadas a um ID de usuário específico.
+     * @param usuarioId Identificador único do usuário no banco de dados.
+     * @param nomeDoTitular Nome do proprietário para instanciar os objetos de Conta.
+     * @return Uma {@code List<Conta>} contendo instâncias de ContaCorrente ou ContaPoupanca.
+     * Retorna uma lista vazia caso o usuário não possua contas.
+     */
     public List<Conta> buscarContasDoUsuario ( int usuarioId, String nomeDoTitular ) {
         String sql = "SELECT * FROM contas WHERE usuario_id = ?";
 
@@ -191,7 +197,11 @@ public class AutenticacaoService {
 
     }
 
-
+    /**
+     * @param usuario é o usuário para qual será criado uma nova conta.
+     * @return {@code true} se a conta foi criada com sucesso; {@code false} se o usurio já atingiu o limite de contas
+     * ou cancelou a operação.
+     */
     public boolean adicionarNovaConta( Usuario usuario ) {
         System.out.println("\n------ ABRIR NOVA CONTA ------");
 
@@ -224,12 +234,15 @@ public class AutenticacaoService {
 
         int numeroNovaConta = 1000 + ( int ) ( Math.random() * 9000 );
 
-        if (tipo == 1) {
+        if ( tipo == 1 ) {
             novaConta = new ContaCorrente(usuario.getNome(), numeroNovaConta, 0.0);
             tipoStr = "CORRENTE";
-        } else {
+        } else if ( tipo == 2 ){
             novaConta = new ContaPoupanca(usuario.getNome(), numeroNovaConta, 0.0);
             tipoStr = "POUPANÇA";
+        } else {
+            System.out.println("Cancelando a Criação da Conta...");
+            return false;
         }
 
 
@@ -249,7 +262,7 @@ public class AutenticacaoService {
         }
     }
 
-    public void salvarAlteracoes(Conta conta) {
+    public void salvarAlteracoes( Conta conta ) {
         String sql = "UPDATE contas SET saldo = ? WHERE numero = ?";
 
         try {
@@ -262,8 +275,23 @@ public class AutenticacaoService {
         }
     }
 
+    /**
+     *  Executa a transferência de valores entre duas contas distintas.
+     *  <p>
+     *  O método valida se o valor é positivo, se a conta de origem possui saldo suficiente e impede transferências
+     *  para a própria conta.
+     *  A operação é protegida com @Transactional em caso de qualquer no Banco de dados, garantindo que nenhum dado
+     *  seja alterado (Rollback).
+     *  </p>
+     *  @param origem A conta que terá o valor debitado.
+     *  @param destino A conta que receberá o valor.
+     *  @param valor O valor a ser transferido (deve ser maior do que zero).
+     *  @throws DataAccessException Caso ocorra falha na conectividade com o Postgre.
+     *  @throws IllegalArgumentException Se o valor for iválido ou as contas forem iguais.
+     */
+
     @Transactional
-    public void realizarTransferencia (Conta origem, Conta destino, double valor ) {
+    public void realizarTransferencia ( Conta origem, Conta destino, double valor ) {
         if ( valor <= 0 ) throw new IllegalArgumentException("Valor deve ser Positivo!");
         if ( origem.getSaldo() < valor ) throw new IllegalStateException("Saldo Insuficiente");
         if ( origem.getNumero() == destino.getNumero() ) throw new IllegalArgumentException("Conta destino Igual a Origem!");
@@ -272,9 +300,11 @@ public class AutenticacaoService {
 
             jdbcTemplate.update("UPDATE contas SET saldo = saldo + ? WHERE numero = ?", valor, destino.getNumero());
 
-            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)", origem.getNumero(), "TRANSFERENCIA_ENVIADA", -valor);
+            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)",
+                            origem.getNumero(), "TRANSFERENCIA_ENVIADA", -valor);
 
-            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)", destino.getNumero(), "TRANSFERENCIA_RECEBIDA", valor);
+            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)",
+                            destino.getNumero(), "TRANSFERENCIA_RECEBIDA", valor);
 
         } catch ( DataAccessException e ) {
             System.out.println("ERRO CRÍTICO: " + e.getMostSpecificCause().getMessage());
@@ -295,7 +325,8 @@ public class AutenticacaoService {
 
             System.out.println("Atualizando Banco de Dados...");
 
-            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)", destino.getNumero(), "DEPOSITO", valor);
+            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)",
+                            destino.getNumero(), "DEPOSITO", valor);
 
             System.out.printf("%.2f Deposito com sucesso!", valor);
 
@@ -304,6 +335,7 @@ public class AutenticacaoService {
 
         }
     }
+
 
     @Transactional
     public void realizarSaque ( Conta destino ) {
@@ -316,7 +348,8 @@ public class AutenticacaoService {
 
             System.out.println("Atualizando Banco de Dados...");
 
-            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)", destino.getNumero(), "SAQUE", -valor);
+            jdbcTemplate.update("INSERT INTO extrato (conta_numero, tipo, valor) VALUES (?, ?, ?)",
+                            destino.getNumero(), "SAQUE", -valor);
 
             System.out.println("Saque realizado com sucesso!");
 
@@ -331,7 +364,7 @@ public class AutenticacaoService {
 
         for ( Conta c : contas ) {
 
-          if (c.getNumero() != conta.getNumero()) {
+          if ( c.getNumero() != conta.getNumero() ) {
               String tipo = ( c instanceof ContaCorrente ) ? "CORRENTE" : "POUPANÇA";
               System.out.printf("\nMudando para a Conta %s...\n", tipo);
 
@@ -360,7 +393,8 @@ public class AutenticacaoService {
 
             for ( Map<String, Object> row : rows ) {
                 DateTimeFormatter formatador = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-                String dataFormatada = ((java.sql.Timestamp) row.get("data_movimentacao")).toLocalDateTime().format(formatador);
+                String dataFormatada = ((java.sql.Timestamp) row.get("data_movimentacao")).toLocalDateTime()
+                                        .format(formatador);
 
                 String tipo = ( String ) row.get("tipo");
                 Double valor = (( Number ) row.get("valor")).doubleValue();

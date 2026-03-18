@@ -32,35 +32,38 @@ public class BancoLuizApplication implements CommandLineRunner {
     public void run(String... args) throws Exception {
         boolean isRunning = true;
 
+        // Loop principal que mantém o aplicativo rodando até o usuário decidir sair (Opção Sair no Login)
         while ( isRunning ) {
 
-            // Usa o service para mostrar a tela de login ao Usuário
             Usuario usuarioLogado = service.login();
 
 
             if ( usuarioLogado != null ) {
-                // Busca no banco se existem contas
+                // Passo 2: Sincronização. Busca as contas do usuário no banco para carregar no objeto em memória.
                 List<Conta> contasDoBanco = service.buscarContasDoUsuario(usuarioLogado.getId(), usuarioLogado.getNome());
                 usuarioLogado.setContas( contasDoBanco );
 
-                // SÓ mostra a mensagem se NÃO for um cadastro novo ou se realmente deveria haver contas
+                // Passo 3: Onboarding. Se o usuário for novo e não tiver contas, força a abertura da primeira.
                 if ( usuarioLogado.getContas().isEmpty() ) {
-                    // Em vez de apenas printar, você pode chamar o abrir conta direto
+
                     System.out.println("Bem-vindo ao JBank! Vamos abrir sua primeira conta?");
                     service.adicionarNovaConta( usuarioLogado );
 
-                    // Após adicionar, o programa segue para o menu de operações
+                    // O fluxo continua para que ele possa usar a conta que acabou de criar
                 }
 
-                // Faz o usuário escolher qual conta ele quer usar
+                // Passo 4: Seleção. O usuário escolhe com qual conta (Corrente/Poupança) deseja operar agora.
 
                 Conta contaParaUsar = menuOperacoes( usuarioLogado );
 
+                // Passo 5: Operação. Entra no menu de ações financeiras (Saque, Pix, Extrato).
                 if ( contaParaUsar != null ) {
                     realizarAcoesNaConta( contaParaUsar, service, usuarioLogado );
 
                 }
             } else {
+                // Se o login retornar null, significa que o usuário escolheu "Sair" na tela inicial.
+                isRunning = false;
                 break;
             }
         }
@@ -81,21 +84,21 @@ public class BancoLuizApplication implements CommandLineRunner {
         }
 
         try {
-                System.out.println("Valor da Transferência: ");
-                double valorTransf = InputReader.lerDouble();
+            System.out.println("Valor da Transferência: ");
+            double valorTransf = InputReader.lerDouble();
 
-                service.realizarTransferencia( contaSelecionada , contaDestino, valorTransf );
+            service.realizarTransferencia( contaSelecionada , contaDestino, valorTransf );
 
-                System.out.println("Transferência Realizada com Sucesso!");
+            System.out.println("Transferência Realizada com Sucesso!");
 
-            } catch ( Exception e ) {
-                System.out.println("ERRO: " + e.getMessage());
-            }
+        } catch ( Exception e ) {
+            System.out.println("ERRO: " + e.getMessage());
+        }
 
     }
 
-    // Recebe um usuário e retorna suas contas e Indices para o Usuário escolher em qual conta logar
 
+    // Método que define qual conta o usuário vai usar
     public Conta menuOperacoes( Usuario logado ) {
         List<Conta> contas = logado.getContas();
 
@@ -133,7 +136,10 @@ public class BancoLuizApplication implements CommandLineRunner {
         }
     }
 
-    // Interface do APP Jbank
+    /**
+     *  Interface de operações financeiras do JBank.
+     *  Gerencia o loop de ações (Saque, Depósito, Transferência) numa conta específica.
+     */
 
     public void realizarAcoesNaConta( Conta contaSelecionada, AutenticacaoService service, Usuario usuario ) {
         int escolha = 0;
@@ -141,9 +147,11 @@ public class BancoLuizApplication implements CommandLineRunner {
 
         Conta contaAtual = contaSelecionada;
 
+        // Loop de operações: mantém o usuário "dentro" da conta até ele escolher Sair ou Trocar.
         while ( !notRunning ) {
 
-            String tipo = (contaAtual instanceof ContaCorrente) ? "CORRENTE" : "POUPANÇA";
+            // Exibição do Menu Principal de Ações
+            String tipo = ( contaAtual instanceof ContaCorrente ) ? "CORRENTE" : "POUPANÇA";
             System.out.printf("\n>>> CONTA ATUAL: %d (%s) | SALDO: R$%.2f <<<\n",
                                 contaAtual.getNumero(), tipo, contaAtual.getSaldo());
 
@@ -155,29 +163,35 @@ public class BancoLuizApplication implements CommandLineRunner {
             escolha = InputReader.lerInt();
 
             switch ( escolha ) {
+                // Operações de Leitura e Escrita no Banco (via Service)
                 case 1 -> service.exibirExtrato( contaAtual.getNumero(), contaAtual );
-
                 case 2 -> service.realizarSaque( contaAtual );
-
                 case 3 -> service.realizarDeposito( contaAtual );
 
+                // Operação Complexa: Envolve busca de destinatário e transação SQL
                 case 4 -> realizaFluxoTransferencia( contaAtual );
 
+                // Gestão de Contas: Permiti adicionar uma segunda conta (Corrente/Poupança) sem deslogar
                 case 5 -> service.adicionarNovaConta( usuario );
 
+                // Troca de Contexto: Sai do loop atual para escolher outra conta do mesmo usuário
                 case 6 -> {
                     Conta nova = service.trocarDeConta( usuario, contaAtual );
+                    // Se o usuário possuir outra conta, reinicia o menu com a nova conta
                     if ( nova != null ) contaAtual = nova;
 
                 }
-                case 7 -> {
 
+                // Encerramento de sessão na conta atual
+                case 7 -> {
                     System.out.println("Deslogando...");
                     notRunning = true;
+
                 }
 
-                default -> System.out.println("Opção Inválida!");
+                default -> System.out.println("Opção Inválida. Tente novamente.");
             }
+
         }
     }
 }
