@@ -88,4 +88,4 @@ Certifique-se de que o PostgreSQL está rodando no seu Arch Linux e crie um banc
 Edite o arquivo src/main/resources/application.properties com o seu usuário e senha do Postgres.
 
 4. Execute a aplicação:
-./mvnw spring-boot:run
+./gradlew bootRun
